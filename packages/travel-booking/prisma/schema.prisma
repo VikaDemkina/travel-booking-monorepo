@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  USER
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  email         String?    @unique
+  password      String?
+  emailVerified DateTime?
+  image         String?
+  role          UserRole   @default(USER)
+  accounts      Account[]
+  sessions      Session[]
+  tours         Tour[]
+  bookings      Booking[]
+  reviews       Review[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Страны для путешествий
+model Country {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String     @db.Text
+  image       String
+  tours       Tour[]
+  cities      City[]
+}
+
+// Города
+model City {
+  id          String    @id @default(cuid())
+  name        String
+  description String    @db.Text
+  image       String
+  countryId   String
+  country     Country   @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  tours       Tour[]
+
+  @@index([countryId])
+}
+
+// Типы туров
+enum TourType {
+  ADVENTURE
+  BEACH
+  CULTURAL
+  CRUISE
+  HIKING
+  SAFARI
+  SKIING
+  SIGHTSEEING
+  CULINARY
+  WELLNESS
+}
+
+// Туры вместо отелей
+model Tour {
+  id            String    @id @default(cuid())
+  userEmail     String
+  title         String    @db.Text
+  description   String    @db.Text
+  image         String
+  tourType      TourType  @default(SIGHTSEEING)
+  countryId     String
+  cityId        String?
+  duration      Int       // Продолжительность тура в днях
+  pricePerPerson Int       // Цена за человека
+  maxGroupSize  Int       // Максимальный размер группы
+  included      String    @db.Text  // Что включено в тур
+  excluded      String    @db.Text  // Что не включено в тур
+  itinerary     String    @db.Text  // Маршрут/программа тура
+  addedAt       DateTime  @default(now())
+  updatedAt     DateTime  @default(now())
+  bookings      Booking[]
+  reviews       Review[]
+  user          User      @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  country       Country   @relation(fields: [countryId], references: [id])
+  city          City?     @relation(fields: [cityId], references: [id])
+  rating        Decimal   @db.Decimal(2, 1) @default(4.0)
+
+  @@index([userEmail])
+  @@index([countryId])
+  @@index([cityId])
+}
+
+// Бронирования
+model Booking {
+  id             String   @id @default(uuid())
+  userId         String
+  tourId         String
+  startDate      DateTime
+  endDate        DateTime
+  numberOfPeople Int      // Количество человек
+  totalPrice     Int
+  status         String   @default("pending") // pending, confirmed, cancelled
+  bookedAt       DateTime @default(now())
+  Tour           Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tourId])
+}
+
+// Отзывы о турах
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  tourId    String
+  rating    Int
+  comment   String   @db.Text
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tour      Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tourId])
+}
