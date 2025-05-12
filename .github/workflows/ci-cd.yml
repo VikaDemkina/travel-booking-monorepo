@@ -1,0 +1,107 @@
+name: CI/CD с измерением метрик
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  COMMIT_SHA: ${{ github.sha }}
+  COMMIT_TIME: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout код
+      uses: actions/checkout@v4
+    
+    - name: Установка Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Установка PNPM
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9
+        run_install: false
+    
+    - name: Получение кэша pnpm
+      id: pnpm-cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          **/node_modules
+          ~/.pnpm-store
+        key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-
+    
+    - name: Установка зависимостей
+      run: pnpm install
+    
+    - name: Запись времени начала сборки
+      id: build-start
+      run: echo "BUILD_START_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+    
+    - name: Сборка проекта с измерением времени
+      run: pnpm build:with-metrics
+    
+    - name: Запись времени окончания сборки
+      id: build-end
+      run: echo "BUILD_END_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+    
+    - name: Запись времени начала деплоя
+      id: deploy-start
+      run: echo "DEPLOY_START_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+    
+    - name: Имитация деплоя (замените своим процессом деплоя)
+      run: |
+        # Здесь должен быть ваш реальный процесс деплоя
+        # Например, использование Vercel, Netlify или другого сервиса
+        echo "Имитация деплоя приложения..."
+        sleep 10  # Имитация времени деплоя
+        echo "Деплой успешно завершен!"
+    
+    - name: Измерение метрик деплоя
+      run: node scripts/deployment-metrics.js "${{ env.COMMIT_SHA }}" "${{ env.COMMIT_TIME }}" "${{ env.DEPLOY_START_TIME }}"
+    
+    - name: Сохранение метрик как артефакт
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-metrics
+        path: metrics/
+    
+    - name: Создание issue с результатами метрик при PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Читаем последний файл метрик
+          const metricsDir = path.join(process.env.GITHUB_WORKSPACE, 'metrics');
+          const files = fs.readdirSync(metricsDir).filter(file => file.startsWith('deployment-metrics-'));
+          const latestFile = files.sort().pop();
+          
+          if (latestFile) {
+            const metricsData = JSON.parse(fs.readFileSync(path.join(metricsDir, latestFile), 'utf8'));
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## Метрики CI/CD для PR #${context.issue.number}
+              
+              - **Время от коммита до окончания деплоя**: ${metricsData.commitToDeployDurationSec} секунд
+              - **Время деплоя**: ${metricsData.deploymentDurationSec} секунд
+              - **Commit SHA**: ${metricsData.commitSha}
+              
+              Детальную информацию можно найти в артефактах этого workflow.`
+            });
+          }
