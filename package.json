@@ -1,0 +1,32 @@
+{
+  "name": "travel-booking-monorepo",
+  "version": "1.0.0",
+  "description": "Монорепозиторий для проекта бронирования путешествий",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter travel-booking dev",
+    "build": "pnpm --filter travel-booking build",
+    "start": "pnpm --filter travel-booking start",
+    "lint": "pnpm --filter travel-booking lint",
+    "build:all": "cross-env MEASURE_BUILD_TIME=true pnpm -r build",
+    "build:with-metrics": "node scripts/measure-build-time.js",
+    "test": "pnpm -r test",
+    "prisma:generate": "pnpm --filter travel-booking prisma generate",
+    "prisma:migrate": "pnpm --filter travel-booking prisma migrate dev",
+    "postinstall": "pnpm prisma:generate"
+  },
+  "keywords": [
+    "monorepo",
+    "travel",
+    "booking",
+    "metrics"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "fs-extra": "^11.2.0",
+    "pnpm": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}
