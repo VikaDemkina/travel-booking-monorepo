@@ -31,6 +31,12 @@ const buildMetrics = {
 const timestamp = new Date().toISOString().replace(/:/g, '-');
 const buildMetricsFile = path.join(metricsDir, `next-build-metrics-${timestamp}.json`);
 
-fs.writeJSONSync(buildMetricsFile, buildMetrics, { spaces: 2 });
-console.log(`Метрики сборки Next.js сохранены в ${buildMetricsFile}`);
-console.log(`Время сборки Next.js: ${buildMetrics.buildDurationSec} сек.`);
+try {
+  fs.writeJSONSync(buildMetricsFile, buildMetrics, { spaces: 2 });
+  console.log(`Метрики сборки Next.js сохранены в ${buildMetricsFile}`);
+  console.log(`Время сборки Next.js: ${buildMetrics.buildDurationSec} сек.`);
+} catch (error) {
+  console.error(`Ошибка при сохранении метрик сборки: ${error.message}`);
+  console.error(`Путь к файлу метрик: ${buildMetricsFile}`);
+  console.error(`Директория существует: ${fs.existsSync(path.dirname(buildMetricsFile))}`);
+}
